@@ -14,7 +14,7 @@ class CameraService {
         _cameras![0],
         ResolutionPreset.low, // Reduce resolution to avoid OOM
         enableAudio: false,
-        imageFormatGroup: ImageFormatGroup.bgra8888, 
+        imageFormatGroup: ImageFormatGroup.yuv420, // YUV format for Android
       );
       await _controller!.initialize();
     }

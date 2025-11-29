@@ -44,7 +44,7 @@ class InferenceService {
       if (outputs.isNotEmpty) {
         final outputValue = outputs[0];
         
-        // YOLO output is typically [1, 84, 8400]
+        // YOLO output is typically [1, 11, 8400] for this model
         // We need to flatten it to a 1D list
         final dynamic rawOutput = outputValue?.value;
         List<double> flatOutput = [];

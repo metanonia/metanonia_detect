@@ -42,7 +42,7 @@ class _HomeScreenState extends State<HomeScreen> {
       
       _cameraService.startImageStream((image) async {
         if (_isProcessing) return;
-        if (DateTime.now().millisecondsSinceEpoch - _lastRun < 500) return; // 2 FPS limit
+        if (DateTime.now().millisecondsSinceEpoch - _lastRun < 1000) return; // 1 FPS limit for better performance
 
         _isProcessing = true;
         _lastRun = DateTime.now().millisecondsSinceEpoch;
@@ -150,6 +150,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       painter: BoundingBoxPainter(
                         detections: _detections,
                         imageSize: const Size(640, 640),
+                        cameraController: _cameraService.controller!,
                       ),
                     ),
                   ),

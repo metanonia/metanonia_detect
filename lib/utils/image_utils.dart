@@ -55,8 +55,30 @@ class ImageUtils {
       }
     }
 
-    // Resize
-    final resized = img.copyResize(imgBuffer, width: data.inputSize, height: data.inputSize);
+    // Letterbox resize to preserve aspect ratio
+    // Calculate scaling to fit within 640x640 while maintaining aspect ratio
+    final double scale = (data.width > data.height) 
+        ? data.inputSize / data.width 
+        : data.inputSize / data.height;
+    
+    final int newWidth = (data.width * scale).round();
+    final int newHeight = (data.height * scale).round();
+    
+    // Resize maintaining aspect ratio
+    final resized = img.copyResize(imgBuffer, width: newWidth, height: newHeight);
+    
+    // Create 640x640 canvas with padding (letterbox)
+    final canvas = img.Image(width: data.inputSize, height: data.inputSize);
+    
+    // Fill with gray (114, 114, 114) - standard YOLO padding color
+    img.fill(canvas, color: img.ColorRgb8(114, 114, 114));
+    
+    // Calculate padding offsets to center the image
+    final int offsetX = ((data.inputSize - newWidth) / 2).round();
+    final int offsetY = ((data.inputSize - newHeight) / 2).round();
+    
+    // Composite resized image onto canvas
+    img.compositeImage(canvas, resized, dstX: offsetX, dstY: offsetY);
     
     // Normalize and convert to Float32List
     final Float32List floatList = Float32List(1 * 3 * data.inputSize * data.inputSize);
@@ -65,7 +87,7 @@ class ImageUtils {
     for (var c = 0; c < 3; c++) {
       for (var y = 0; y < data.inputSize; y++) {
         for (var x = 0; x < data.inputSize; x++) {
-          final pixel = resized.getPixel(x, y);
+          final pixel = canvas.getPixel(x, y);
           double val = 0;
           if (c == 0) val = pixel.r / 255.0;
           if (c == 1) val = pixel.g / 255.0;

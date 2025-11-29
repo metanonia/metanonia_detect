@@ -18,30 +18,51 @@ class YoloParser {
     double confidenceThreshold,
     double iouThreshold,
   ) {
-    // YOLO output is typically [1, 84, 8400] for YOLOv8
-    // Transposed to [8400, 84] where each row is [x, y, w, h, class0_conf, class1_conf, ...]
+    // Determine actual output shape from size
+    // Expected: 92,400 = 1 * 11 * 8400 (not 1 * 84 * 8400)
+    // Format: [batch, features, detections]
+    // Features: [x, y, w, h, class0_conf, class1_conf, ..., class6_conf]
     
     final int numDetections = 8400;
-    final int numClasses = classNames.length;
-    final int stride = 4 + numClasses; // x, y, w, h + class scores
+    final int numClasses = classNames.length; // 7
+    final int numFeatures = 4 + numClasses; // 11 = 4 bbox coords + 7 classes
+    
+    // Verify output size
+    final expectedSize = 1 * numFeatures * numDetections;
+    if (output.length != expectedSize) {
+      print('WARNING: Output size mismatch. Got ${output.length}, expected $expectedSize');
+      print('Calculated: 1 * $numFeatures * $numDetections = $expectedSize');
+    }
 
     List<Detection> detections = [];
 
-    for (int i = 0; i < numDetections; i++) {
-      final int offset = i * stride;
-      
-      // Get bounding box
-      final double x = output[offset];
-      final double y = output[offset + 1];
-      final double w = output[offset + 2];
-      final double h = output[offset + 3];
+    // Helper function to get value at [feature_idx][detection_idx]
+    // In flattened array [1, 11, 8400], index = feature_idx * 8400 + detection_idx
+    double getValue(int featureIdx, int detectionIdx) {
+      final index = featureIdx * numDetections + detectionIdx;
+      if (index >= output.length) {
+        print('ERROR: Index $index out of bounds (length: ${output.length})');
+        return 0.0;
+      }
+      return output[index];
+    }
 
-      // Find max class score
+    for (int i = 0; i < numDetections; i++) {
+      // Get bounding box coordinates (first 4 features)
+      // Standard YOLOv8/11 output is [cx, cy, w, h]
+      final double cx = getValue(0, i);
+      final double cy = getValue(1, i);
+      final double w = getValue(2, i);
+      final double h = getValue(3, i);
+      
+      // No conversion needed if output is already cx, cy, w, h
+
+      // Find max class score (features 4 to 4+numClasses-1)
       double maxScore = 0;
       int maxClassId = 0;
       
       for (int c = 0; c < numClasses; c++) {
-        final double score = output[offset + 4 + c];
+        final double score = getValue(4 + c, i);
         if (score > maxScore) {
           maxScore = score;
           maxClassId = c;
@@ -51,8 +72,8 @@ class YoloParser {
       // Filter by confidence
       if (maxScore > confidenceThreshold) {
         detections.add(Detection(
-          x: x,
-          y: y,
+          x: cx,
+          y: cy,
           width: w,
           height: h,
           confidence: maxScore,
@@ -60,6 +81,11 @@ class YoloParser {
           className: classNames[maxClassId],
         ));
       }
+    }
+
+    // Debug logging only when detections found
+    if (detections.isNotEmpty) {
+      print('✓ ${detections.length} detections: ${detections.first.className} ${(detections.first.confidence * 100).toStringAsFixed(0)}%');
     }
 
     // Apply NMS
