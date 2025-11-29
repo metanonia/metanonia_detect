@@ -1,4 +1,4 @@
-# metanonia_detect
+# strawberry_disease_detection
 ## Strawberry Disease Detection App
 
 - Google AntiGravity 테스트용
