@@ -85,6 +85,7 @@ class _HomeScreenState extends State<HomeScreen> {
       
     } catch (e) {
       setState(() {
+        _isInitializing = false;
         _resultText = "Error: $e";
       });
     }
@@ -157,7 +158,21 @@ class _HomeScreenState extends State<HomeScreen> {
               ],
             )
           else
-            const Center(child: Text("Camera not available")),
+            Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.error, color: Colors.red, size: 48),
+                  const SizedBox(height: 16),
+                  const Text("Camera Error", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Text(_resultText, textAlign: TextAlign.center),
+                  ),
+                ],
+              ),
+            ),
             
           // Red border when disease detected
           if (_diseaseDetected)

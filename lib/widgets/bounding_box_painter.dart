@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import '../models/detection.dart';
@@ -45,44 +46,66 @@ class BoundingBoxPainter extends CustomPainter {
       // Preview is shorter than screen, center vertically
       screenOffsetY = (size.height - previewHeight) / 2;
     }
-    // The image_utils.dart processes the raw sensor image which is LANDSCAPE.
-    // So it scales by width and adds padding to height (Y-padding).
-    
-    // We assume the sensor is landscape (aspect > 1.0)
+    // 3. Calculate Letterbox Info
+    // Determine if sensor is Landscape or Portrait based on aspect ratio
     double sensorAspectRatio = cameraAspectRatio;
-    if (sensorAspectRatio < 1.0) sensorAspectRatio = 1.0 / sensorAspectRatio;
     
-    // In image_utils: 
-    // scale = 640 / sensorWidth
-    // newHeight = sensorHeight * scale = 640 / sensorAspectRatio
-    double contentHeight = 640.0 / sensorAspectRatio;
-    double lbOffsetY = (640.0 - contentHeight) / 2;
+    double contentWidth = 640.0;
+    double contentHeight = 640.0;
+    double lbOffsetX = 0;
+    double lbOffsetY = 0;
+    
+    if (sensorAspectRatio > 1.0) {
+      // Landscape Sensor (e.g. Android) -> Y-Padding
+      contentHeight = 640.0 / sensorAspectRatio;
+      lbOffsetY = (640.0 - contentHeight) / 2;
+    } else {
+      // Portrait Sensor (e.g. iOS) -> X-Padding
+      contentWidth = 640.0 * sensorAspectRatio;
+      lbOffsetX = (640.0 - contentWidth) / 2;
+    }
 
     for (var detection in detections) {
       // 4. Coordinate Transformation
       
-      // Step A: Remove Y-Padding (Get coordinates in 640 x contentHeight space)
-      double rawY = detection.y - lbOffsetY;
-      double rawX = detection.x;
+      double screenX, screenY, screenW, screenH;
       
-      // Step B: Normalize to 0..1 (Relative to Sensor Frame)
-      double normX = rawX / 640.0;
-      double normY = rawY / contentHeight;
-      double normW = detection.width / 640.0;
-      double normH = detection.height / contentHeight;
-      
-      // Step C: Rotate 90 Degrees (Sensor Landscape -> Screen Portrait)
-      // Standard rotation: (x, y) -> (y, x) or (y, 1-x) depending on sensor mount.
-      // Image evidence shows Left-Right Mirroring (Object Left, Bbox Right).
-      // This requires X-axis inversion.
-      
-      // Screen X = (1.0 - normY) * previewWidth
-      // Screen Y = normX * previewHeight
-      
-      double screenX = (1.0 - normY) * previewWidth;
-      double screenY = normX * previewHeight;
-      double screenW = normH * previewWidth;
-      double screenH = normW * previewHeight;
+      if (Platform.isIOS) {
+        // iOS: Stream is usually Portrait (matches screen) -> No Rotation needed
+        // Remove X-Padding (if any)
+        double rawX = detection.x - lbOffsetX;
+        double rawY = detection.y - lbOffsetY;
+        
+        double normX = rawX / contentWidth;
+        double normY = rawY / 640.0; // Height is full 640 in Portrait letterbox
+        double normW = detection.width / contentWidth;
+        double normH = detection.height / 640.0;
+        
+        // Direct Mapping (No Swap, No Mirroring)
+        // User feedback indicates Mirroring logic moved box to wrong side.
+        // Reverting to standard mapping.
+        screenX = normX * previewWidth;
+        screenY = normY * previewHeight;
+        screenW = normW * previewWidth;
+        screenH = normH * previewHeight;
+        
+      } else {
+        // Android: Stream is Landscape (90 deg offset) -> Swap X/Y needed
+        // Remove Y-Padding
+        double rawY = detection.y - lbOffsetY;
+        double rawX = detection.x;
+        
+        double normX = rawX / 640.0; // Width is full 640 in Landscape letterbox
+        double normY = rawY / contentHeight;
+        double normW = detection.width / 640.0;
+        double normH = detection.height / contentHeight;
+        
+        // Rotate 90 deg + Invert X (Mirroring fix)
+        screenX = (1.0 - normY) * previewWidth;
+        screenY = normX * previewHeight;
+        screenW = normH * previewWidth;
+        screenH = normW * previewHeight;
+      }
       
       // Apply Screen Offsets
       // User feedback: "Height is a bit small... doesn't cover object fully"

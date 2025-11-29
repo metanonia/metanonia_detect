@@ -13,7 +13,7 @@ class CameraService {
     if (_cameras != null && _cameras!.isNotEmpty) {
       _controller = CameraController(
         _cameras![0],
-        ResolutionPreset.low, // Reduce resolution to avoid OOM
+        ResolutionPreset.medium, // Use medium for better compatibility
         enableAudio: false,
         imageFormatGroup: Platform.isAndroid 
             ? ImageFormatGroup.yuv420 
